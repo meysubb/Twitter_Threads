@@ -11,7 +11,7 @@ pbp_18 <- read_csv("https://raw.githubusercontent.com/ryurko/nflscrapR-data/mast
 pbp_func <- function(x){
   x %>% filter(penalty==1 & penalty_type=='Defensive Pass Interference') %>% 
     select("home_team","away_team","qtr","down","goal_to_go","time","ydstogo",
-           "penalty_team","penalty_yards","posteam","game_date",
+           "penalty_team","penalty_yards","posteam","defteam","game_date",
            "posteam_score","defteam_score","epa") %>% mutate(year = year(game_date),
                                                        difference = abs(posteam_score-defteam_score)) %>% select(-game_date)
 } 
@@ -23,18 +23,23 @@ all_pis <- list( pbp_15,pbp_16,pbp_17,pbp_18 ) %>%
 all_pis[all_pis$posteam == "SD","posteam"] = "LAC"
 all_pis[all_pis$posteam == "STL","posteam"] = "LA"
 
+all_pis[all_pis$defteam == "SD","defteam"] = "LAC"
+all_pis[all_pis$defteam == "STL","defteam"] = "LA"
+
 # General PI Distribution 
 dat <- data.frame(yds = c(10,15,20,30),yds_text = paste0(c(10,15,20,30)," Yards"))
 
-mean_yards_team <- all_pis %>% group_by(posteam) %>% summarize(mean_yards = mean(penalty_yards))
+mean_yards_team <- all_pis %>% group_by(posteam) %>% summarize(mean_yards = mean(penalty_yards,na.rm=T))
+mean_yards_against <- all_pis %>% group_by(defteam) %>% summarize(mean_yards_def = mean(penalty_yards,na.rm=T))
 
 all_pis2 <- all_pis %>% inner_join(mean_yards_team)
+all_pis2 <- all_pis2 %>% inner_join(mean_yards_against)
 
 library(viridis)   
  
 
 ### PI Distribution
-p4<-ggplot(all_pis2) + 
+yearly_pi_dist<-ggplot(all_pis2) + 
   geom_histogram(aes(penalty_yards,fill=factor(year)),alpha=0.8) + 
   facet_grid(year~.) + theme_bw(base_size = 16) + 
   scale_fill_brewer(palette="Dark2") + 
@@ -46,14 +51,28 @@ p4<-ggplot(all_pis2) +
        subtitle = "Distrbution of Defense PIs by Year")
 
 ### PI Distribution by team 
+library(ggridges)
+library(viridis)
 
-p1<-ggplot(all_pis2, aes(x = penalty_yards,y = forcats::fct_rev(factor(posteam)),fill=mean_yards)) + 
+pi_drawn<-ggplot(all_pis2, aes(x = penalty_yards,y = forcats::fct_rev(factor(posteam)),fill=mean_yards)) + 
   geom_density_ridges(scale = 3, rel_min_height = 0.01) + 
   theme_bw(base_size = 16) + 
   scale_fill_viridis(option="inferno",direction=-1,name="Penalty \n Yds") +
   labs(x="Penalty Yards",y="Team",
-       title = "Distribution of Defesnse PIs by Team",
-       subtitle = "2015 - 2018")
+       title = "Defense PIs drawn (Offense)",
+       subtitle = "2015 - 2018",
+       caption = "@msubbaiah1")
+
+pi_committed<-ggplot(all_pis2, aes(x = penalty_yards,y = forcats::fct_rev(factor(defteam)),fill=mean_yards_def)) + 
+  geom_density_ridges(scale = 3, rel_min_height = 0.01) + 
+  theme_bw(base_size = 16) + 
+  scale_fill_viridis(option="inferno",direction=-1,name="Penalty \n Yds") +
+  labs(x="Penalty Yards",y="Team",
+       title = "Defense PIs committed (Defense)",
+       subtitle = "2015 - 2018",
+       caption = "@msubbaiah1")
+
+
 
 ### Cluch situations 
 # 1 - less than 2 minutes in second quarter 
@@ -69,11 +88,12 @@ clutch_df_means <- clutch_df %>% group_by(year) %>% summarize(m_yards = mean(pen
 
 clutch_df <- clutch_df %>% inner_join(clutch_df_means)
 
-p3 <- ggplot(clutch_df,aes(x=penalty_yards,y=forcats::fct_rev(factor(year)),alpha=0.8,fill='firebrick3'))+ 
+year_clutch_pi <- ggplot(clutch_df,aes(x=penalty_yards,y=forcats::fct_rev(factor(year)),alpha=0.8,fill='firebrick3'))+ 
   geom_density_ridges(scale=3,rel_min_height=0.01) + theme_bw(base_size=16) + guides(alpha=F,fill=F) + 
+  scale_x_continuous(breaks=seq(0,60,by=10)) + 
   labs(x="Penalty Yards",y="Year",
        title="Defensive PIs in Clutch situations",
-       subtitle="Clutch Situations \n2 mins to go in 2nd, OT, and \nor 10pt game in 4th",
+       subtitle="Clutch Situations Def: \n2 mins to go in 2nd, OT, and \nor 10pt game in 4th",
        caption='@msubbaiah1')
 
   
@@ -88,7 +108,7 @@ epa_sd_values <- data.frame(values = c(mean_value+sd_value,mean_value+(2*sd_valu
 
 clutch_df <- clutch_df %>% filter(epa>-2)
 
-p2 <- ggplot(clutch_df,aes(epa),alpha=0.8) + 
+epa_clutch_year <- ggplot(clutch_df,aes(epa),alpha=0.8) + 
   geom_histogram() + 
   facet_grid(year~.) + theme_bw(base_size=16) + 
   scale_y_continuous(breaks=int_breaks) + 
@@ -100,5 +120,14 @@ p2 <- ggplot(clutch_df,aes(epa),alpha=0.8) +
        subtitle = "Note: Avg/STD calculated from all plays",
        caption = "@msubbaiah1")
 
-cowplot::plot_grid(p4,p1)
-cowplot::plot_grid(p3,p2)
+
+### comments on teams drawing PIs and committed
+### Draw - Pretty much expected to see GB, NE and even the Rams (STL+LA) at the top to some extent. Throughly surprised that 
+### Buffalo is up there in drawing PIs. Looking through the data further, in the 3 year time span, Buffalo drew 22 PIs. A lot of yards
+### gained on those 22 PIs. Note team with the most PIs over this time frame Chargers (49), then Cardinals (44), and Steelers (44). 
+### Jacksonville had an all time low of 9 PI calls in that same period. 
+### Committed - The plot on the left makes me curious about blitz rate and how often corners/safeties are left in man coverage and how that affects PI calls. 
+### Houston is the team that immediately sticks out. 
+cowplot::plot_grid(pi_drawn,pi_committed)
+
+epa_clutch_year
