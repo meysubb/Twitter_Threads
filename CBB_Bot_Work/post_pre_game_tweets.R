@@ -2,6 +2,7 @@ library(ncaahoopR)
 library(lubridate)
 library(tidyverse)
 library(rtweet)
+library(rvest)
 source("twitter_auth.R")
 
 create_token(
