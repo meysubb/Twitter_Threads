@@ -1,5 +1,6 @@
 library(ncaahoopR)
 library(lubridate)
+library(tidyverse)
 library(rtweet)
 source("twitter_auth.R")
 
@@ -11,7 +12,6 @@ create_token(
   access_secret = t_access_secret)
 
 ## Load SEC teams
-
 sec_teams <- readRDS("sec_teams_list.RDS")
 
 today <- Sys.Date()
@@ -19,6 +19,7 @@ today <- Sys.Date()
 daily_sched <- get_master_schedule(year(today),month(today),day(today))
 
 daily_sched_sec <- daily_sched %>% filter(home %in% sec_teams$sec_teams | away %in% sec_teams$sec_teams)
+write.csv(daily_sched_sec,"daily_sched.csv",row.names = FALSE)
 
 get_game_info <- function(game_id){
   base_url <- "http://www.espn.com/mens-college-basketball/game?gameId="
