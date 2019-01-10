@@ -20,6 +20,13 @@ today <- Sys.Date()
 daily_sched <- get_master_schedule(year(today),month(today),day(today))
 
 daily_sched_sec <- daily_sched %>% filter(home %in% sec_teams$sec_teams | away %in% sec_teams$sec_teams)
+
+### Need to clean this up later, before the for loop. 
+if(nrow(daily_sched_sec)==0){
+  final_line <- "There are no SEC basketball games today. Enjoy CBB!"
+  post_tweet(status = final_line) 
+}
+
 write.csv(daily_sched_sec,"daily_sched.csv",row.names = FALSE)
 
 get_game_info <- function(game_id){

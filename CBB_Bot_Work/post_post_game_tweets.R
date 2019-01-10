@@ -23,7 +23,6 @@ for(i in 1:nrow(daily_sched_sec)){
   away_team <- daily_sched_sec$away[i]
   away_hashtag <- sec_teams[sec_teams$sec_teams == away_team,'hashtags']
   
-  ncaa_colors$ncaa_name
   home_color <-  ncaa_colors[ncaa_colors$ncaa_name == home_team,'primary_color']
   away_color <-  ncaa_colors[ncaa_colors$ncaa_name == away_team,'primary_color']
   if (length(home_color)==0){
