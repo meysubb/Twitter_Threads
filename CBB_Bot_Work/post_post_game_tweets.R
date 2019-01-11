@@ -14,8 +14,6 @@ create_token(
 sec_teams <- readRDS("sec_teams_list.RDS")
 daily_sched_sec <- read_csv("daily_sched.csv")
 
-
-
 for(i in 1:nrow(daily_sched_sec)){
   val <- daily_sched_sec$game_id[i]
   home_team <- daily_sched_sec$home[i]
@@ -47,6 +45,8 @@ for(i in 1:nrow(daily_sched_sec)){
   
   tweet_text <- paste0("WP Plots for ",away_team," @ ",home_team,". ",home_hashtag," ",away_hashtag)
   post_tweet(status = tweet_text,media = 'wp_chart_plot.png') 
-  #print(tweet_text)
-  #wp_chart
 }
+
+
+final_tweet <- "Look for some additional plots on tonights games, tomorrow morning! #SEC"
+post_tweet(status = final_tweet)

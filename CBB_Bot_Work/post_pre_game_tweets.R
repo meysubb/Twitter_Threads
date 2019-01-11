@@ -3,6 +3,7 @@ library(lubridate)
 library(tidyverse)
 library(rtweet)
 library(rvest)
+library(bigballR)
 source("twitter_auth.R")
 
 create_token(
@@ -12,21 +13,43 @@ create_token(
   access_token = t_access_token,
   access_secret = t_access_secret)
 
-## Load SEC teams
+## Load SEC teams + Hashtags 
 sec_teams <- readRDS("sec_teams_list.RDS")
+## Date 
+today <- Sys.Date()-2
 
-today <- Sys.Date()
+daily_sched <-
+  get_master_schedule(year(today), month(today), day(today))
 
-daily_sched <- get_master_schedule(year(today),month(today),day(today))
+daily_sched_sec <-
+  daily_sched %>% filter(home %in% sec_teams$sec_teams |
+                           away %in% sec_teams$sec_teams) %>% 
+  mutate(away = gsub("State","St.",away),
+         home = gsub("State","St.",home))
 
-daily_sched_sec <- daily_sched %>% filter(home %in% sec_teams$sec_teams | away %in% sec_teams$sec_teams)
 
-### Need to clean this up later, before the for loop. 
-if(nrow(daily_sched_sec)==0){
+## Get Data from Big Ball R
+sec_today_sched <-
+  get_date_games(date = as.character(format(today, "%m/%d/%Y")), conference = "SEC") %>% 
+  select(Date,Start_Time,Home,Away)
+colnames(sec_today_sched) <- tolower(colnames(sec_today_sched)) 
+
+### Need to clean this up later, before the for loop.
+if (nrow(daily_sched_sec) == 0) {
   final_line <- "There are no SEC basketball games today. Enjoy CBB!"
-  post_tweet(status = final_line) 
+  post_tweet(status = final_line)
+  quit()
 }
 
+
+### Merge the dataframes together
+if(nrow(daily_sched_sec)==nrow(sec_today_sched)) {
+  daily_sched_sec <-
+    sec_today_sched %>% inner_join(daily_sched_sec, by = c("away", "home"))
+}
+
+
+## what do i do here when loading to heroku? 
 write.csv(daily_sched_sec,"daily_sched.csv",row.names = FALSE)
 
 get_game_info <- function(game_id){
@@ -51,6 +74,8 @@ for(i in 1:nrow(daily_sched_sec)){
   away_team <- daily_sched_sec$away[i]
   away_hashtag <- sec_teams[sec_teams$sec_teams == away_team,'hashtags']
   
+  
+  
   s <- get_game_info(val)
   s <- s[s != ""]
   
@@ -58,13 +83,17 @@ for(i in 1:nrow(daily_sched_sec)){
   cov <- s[2]
   line <- s[4]
   
-  
   line1 <- paste0("Today's Game ", i ,": ",away_team, " @ ",home_team," (",arena,"),",cov)
+  if('start_time' %in% colnames(daily_sched_sec)){
+    start_time <- daily_sched_sec$start_time[i]
+    line1 <- paste0("Today's Game ", i ,": ",away_team, " @ ",home_team," (",arena,"), ",start_time," - ",cov)
+  }
+  
+  
   line2 <- paste0("Line: ",line,".")
   line3 <- paste0(home_hashtag," ",away_hashtag)
   
   final_line <- paste(line1,line2,line3)
-  
   post_tweet(status = final_line) 
 }
 
