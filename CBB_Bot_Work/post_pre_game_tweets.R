@@ -6,6 +6,7 @@ library(rvest)
 library(bigballR)
 source("twitter_auth.R")
 
+
 create_token(
   app = t_app,
   consumer_key = t_consumer_key,
@@ -16,10 +17,20 @@ create_token(
 ## Load SEC teams + Hashtags 
 sec_teams <- readRDS("sec_teams_list.RDS")
 ## Date 
-today <- Sys.Date()-2
+today <- Sys.Date()
 
-daily_sched <-
-  get_master_schedule(year(today), month(today), day(today))
+daily_sched <- tryCatch({
+  daily_sched <-
+    get_master_schedule(year(today), month(today), day(today))
+  return(daily_sched)
+}, error = function(err) {
+  source("fix_get_master_schedule.R")
+  daily_sched <-
+    get_master_schedule(year(today), month(today), day(today))
+  return(daily_sched)
+})
+
+
 
 daily_sched_sec <-
   daily_sched %>% filter(home %in% sec_teams$sec_teams |
@@ -29,10 +40,10 @@ daily_sched_sec <-
 
 
 ## Get Data from Big Ball R
-sec_today_sched <-
-  get_date_games(date = as.character(format(today, "%m/%d/%Y")), conference = "SEC") %>% 
-  select(Date,Start_Time,Home,Away)
-colnames(sec_today_sched) <- tolower(colnames(sec_today_sched)) 
+# sec_today_sched <-
+#   get_date_games(date = as.character(format(today, "%m/%d/%Y")), conference = "SEC") %>% 
+#   select(Date,Start_Time,Home,Away)
+# colnames(sec_today_sched) <- tolower(colnames(sec_today_sched)) 
 
 ### Need to clean this up later, before the for loop.
 if (nrow(daily_sched_sec) == 0) {
@@ -41,12 +52,11 @@ if (nrow(daily_sched_sec) == 0) {
   quit()
 }
 
-
-### Merge the dataframes together
-if(nrow(daily_sched_sec)==nrow(sec_today_sched)) {
-  daily_sched_sec <-
-    sec_today_sched %>% inner_join(daily_sched_sec, by = c("away", "home"))
-}
+# ### Merge the dataframes together
+# if(nrow(daily_sched_sec)==nrow(sec_today_sched)) {
+#   daily_sched_sec <-
+#     sec_today_sched %>% inner_join(daily_sched_sec, by = c("away", "home"))
+# }
 
 
 ## what do i do here when loading to heroku? 
